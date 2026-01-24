@@ -57,7 +57,7 @@ class Sat1Microphone : public I2SAudioIn, public microphone::Microphone, public 
   bool correct_dc_offset_;
   int32_t dc_offset_{0};
 
-  CallbackManager<void(const std::vector<uint8_t> &)> data_callbacks_{};
+  CallbackManager<void(const std::vector<uint8_t> &)> pcm_data_callbacks_{};
 };
 
 
