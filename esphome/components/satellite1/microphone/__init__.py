@@ -2,6 +2,7 @@ from esphome import pins, automation
 import esphome.codegen as cg
 from esphome.components import audio, esp32, microphone
 from esphome.components.adc import ESP32_VARIANT_ADC1_PIN_TO_CHANNEL, validate_adc_pin
+from esphome.components.m
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_BITS_PER_SAMPLE,
@@ -34,7 +35,7 @@ CONF_ADC_TYPE = "adc_type"
 CONF_CORRECT_DC_OFFSET = "correct_dc_offset"
 CONF_PDM = "pdm"
 CONF_ON_PCM_DATA = "on_pcm_data"
-PCMDataTrigger = microphone_ns.class_(
+PCMDataTrigger = i2s_audio_ns.class_(
     "PCMDataTrigger",
     automation.Trigger.template(cg.std_vector.template(cg.uint8).operator("ref")),
 )
