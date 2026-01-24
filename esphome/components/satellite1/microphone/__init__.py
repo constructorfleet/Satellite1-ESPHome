@@ -2,7 +2,6 @@ from esphome import pins, automation
 import esphome.codegen as cg
 from esphome.components import audio, esp32, microphone
 from esphome.components.adc import ESP32_VARIANT_ADC1_PIN_TO_CHANNEL, validate_adc_pin
-from esphome.components.m
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_BITS_PER_SAMPLE,
