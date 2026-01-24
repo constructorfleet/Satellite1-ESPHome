@@ -146,7 +146,7 @@ void Sat1Microphone::loop() {
   }
 }
 
-void Microphone::add_pcm_data_callback(std::function<void(const std::vector<uint8_t> &)> &&pcm_data_callback) {
+void Sat1Microphone::add_pcm_data_callback(std::function<void(const std::vector<uint8_t> &)> &&pcm_data_callback) {
   std::function<void(const std::vector<uint8_t> &)> mute_handled_callback =
       [this, pcm_data_callback](const std::vector<uint8_t> &data) {
         if (this->mute_state_) {
