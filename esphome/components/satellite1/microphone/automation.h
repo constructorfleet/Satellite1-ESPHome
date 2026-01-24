@@ -1,7 +1,7 @@
 #pragma once
 
 #include "esphome/core/automation.h"
-#include "microphone.h"
+#include "sat1_microphone.h"
 
 #include <vector>
 
