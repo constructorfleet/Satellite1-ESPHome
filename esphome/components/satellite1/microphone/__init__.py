@@ -97,15 +97,15 @@ def _supported_satellite1_settings(config):
         raise cv.Invalid("PDM is not supported for the Satellite1 microphone integration.")
     if config[CONF_BITS_PER_SAMPLE] != 32:
         raise cv.Invalid("I2S needs to be set to 32bit for the satellite1 microphone integration.")
-    if config[CONF_SAMPLE_RATE] != 48000:
-        raise cv.Invalid("I2S needs to be set to 48kHz, downsampling to 16kHz is hard coded.")
+    if config[CONF_SAMPLE_RATE] != 16000:
+        raise cv.Invalid("I2S needs to be set to 16kHz for the Satellite1 microphone integration.")
     return config
 
 
 BASE_SCHEMA = microphone.MICROPHONE_SCHEMA.extend(
     i2s_audio_component_schema(
         Sat1Microphone,
-        default_sample_rate=48000,
+        default_sample_rate=16000,
         default_channel=CONF_STEREO,
         default_bits_per_sample="32bit",
     ).extend(

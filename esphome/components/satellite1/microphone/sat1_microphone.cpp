@@ -198,8 +198,7 @@ void Sat1Microphone::configure_stream_settings_() {
     channel_count = 2;
   }
 #endif
-  //report 16kHz sample rate, as the 48kHz i2s samples will be subsampled to 16kHz
-  this->audio_stream_info_ = audio::AudioStreamInfo(bits_per_sample, channel_count, 16000);
+  this->audio_stream_info_ = audio::AudioStreamInfo(bits_per_sample, channel_count, this->sample_rate_);
 }
 
 
@@ -293,8 +292,7 @@ void Sat1Microphone::mic_task(void *params) {
   xEventGroupSetBits(this_microphone->event_group_, MicrophoneEventGroupBits::TASK_STARTING);
   
   {  // Ensures the samples vector is freed when the task stops
-    // read 3 times the amount of bytes as we need to subsample from 48 kHz to 16 kHz
-    const size_t bytes_to_read = 3 * this_microphone->audio_stream_info_.ms_to_bytes(READ_DURATION_MS);
+    const size_t bytes_to_read = this_microphone->audio_stream_info_.ms_to_bytes(READ_DURATION_MS);
     const size_t buffer_size = 2 * pdMS_TO_TICKS(READ_DURATION_MS);
     std::vector<uint8_t> samples;
     samples.reserve(bytes_to_read);
@@ -322,10 +320,6 @@ void Sat1Microphone::mic_task(void *params) {
         if (this_microphone->data_callbacks_.size() == 0) {
           continue;
         }
-        for (size_t i = 0; i < samples_read; i += 3) {
-          samples_32[i / 3] = samples_32[i];
-        }
-        samples.resize((samples_read / 3) * sizeof(int32_t));
         if (this_microphone->correct_dc_offset_) {
           this_microphone->fix_dc_offset_(samples);
         }
