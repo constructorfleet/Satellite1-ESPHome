@@ -70,7 +70,9 @@ WakeWordModel = micro_wake_word_ns.class_("WakeWordModel")
 
 AudioDataTrigger = micro_wake_word_ns.class_(
     "AudioDataTrigger",
-    automation.Trigger.template(cg.std_vector.template(cg.uint8).operator("ref")),
+    automation.Trigger.template(
+        cg.std_vector.template(cg.uint8).operator("ref").operator("const")
+    ),
 )
 
 
@@ -529,13 +531,15 @@ async def to_code(config):
     cg.add(var.set_stop_after_detection(config[CONF_STOP_AFTER_DETECTION]))
 
     if on_audio_data_config := config.get(CONF_ON_AUDIO_DATA):
-        for conf in config.get(CONF_ON_AUDIO_DATA):
+        for conf in on_audio_data_config:
             trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var)
             await automation.build_automation(
                 trigger,
                 [
                     (
-                        cg.std_vector.template(cg.uint8).operator("ref"),
+                        cg.std_vector.template(cg.uint8)
+                        .operator("ref")
+                        .operator("const"),
                         "x",
                     )
                 ],
