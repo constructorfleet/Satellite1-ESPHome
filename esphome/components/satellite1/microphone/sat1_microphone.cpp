@@ -136,7 +136,7 @@ void Sat1Microphone::loop() {
         xTaskCreate(
             &Sat1Microphone::pcm_worker_task,
             "pcm_worker",
-            TASK_STACK_SIZE / 2,          // stack size
+            TASK_STACK_SIZE * 2,          // stack size
             this,
             TASK_PRIORITY - 5,             // priority (lower than mic task)
             &this->pcm_task_handle_
