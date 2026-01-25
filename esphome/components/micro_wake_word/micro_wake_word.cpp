@@ -163,7 +163,7 @@ void MicroWakeWord::audio_data_task(void *params) {
         std::vector<uint8_t>* buffer = nullptr;
         if (xQueueReceive(this_mww->audio_data_queue_, &buffer, portMAX_DELAY) == pdTRUE) {
             if (this_mww->audio_data_callbacks_.size() > 0) {
-                this_mww->audio_data_callbacks_.call(buffer);
+                this_mww->audio_data_callbacks_.call(&buffer);
             }
         }
     }
