@@ -306,7 +306,6 @@ void Sat1Microphone::mic_task(void *params) {
         int32_t* samples_32 = reinterpret_cast<int32_t*>(samples.data());
         auto &buffer = this_microphone->buffer_;
         buffer.insert(buffer.end(), samples_32, samples_32 + samples_read);
-        this_microphone->buffer_.insert(this->buffer_->end(), samples_32, samples_32 + samples_read);
         if (this_microphone->pcm_data_callbacks_.size() > 0 && this->buffer_.size() >= BATCH_SAMPLES) {
           auto *batch = new std::vector<int32_t>();
           batch->reserve(BATCH_SAMPLES);
