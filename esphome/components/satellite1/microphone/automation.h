@@ -8,10 +8,10 @@
 namespace esphome {
 namespace i2s_audio {
 
-class PCMDataTrigger : public Trigger<const std::vector<uint8_t> &> {
+class PCMDataTrigger : public Trigger<const std::vector<int32_t> &> {
  public:
   explicit PCMDataTrigger(Sat1Microphone *mic) {
-    mic->add_pcm_data_callback([this](const std::vector<uint8_t> &data) { this->trigger(data); });
+    mic->add_pcm_data_callback([this](const std::vector<int32_t> &data) { this->trigger(data); });
   }
 };
 

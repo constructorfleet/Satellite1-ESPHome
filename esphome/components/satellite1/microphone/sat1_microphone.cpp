@@ -146,11 +146,11 @@ void Sat1Microphone::loop() {
   }
 }
 
-void Sat1Microphone::add_pcm_data_callback(std::function<void(const std::vector<uint8_t> &)> &&pcm_data_callback) {
-  std::function<void(const std::vector<uint8_t> &)> mute_handled_callback =
-      [this, pcm_data_callback](const std::vector<uint8_t> &data) {
+void Sat1Microphone::add_pcm_data_callback(std::function<void(const std::vector<int32_t> &)> &&pcm_data_callback) {
+  std::function<void(const std::vector<int32_t> &)> mute_handled_callback =
+      [this, pcm_data_callback](const std::vector<int32_t> &data) {
         if (this->mute_state_) {
-          pcm_data_callback(std::vector<uint8_t>(data.size(), 0));
+          pcm_data_callback(std::vector<int32_t>(data.size(), 0));
         } else {
           pcm_data_callback(data);
         };
@@ -255,14 +255,14 @@ void Sat1Microphone::mic_task(void *params) {
       if (this_microphone->data_callbacks_.size() > 0 || this_microphone->pcm_data_callbacks_.size() > 0) {
         samples.resize(bytes_to_read);
         size_t bytes_read = this_microphone->read_(samples.data(), bytes_to_read, 2 * pdMS_TO_TICKS(READ_DURATION_MS));
+        size_t samples_read = bytes_read / sizeof(int32_t);
+        int32_t* samples_32 = reinterpret_cast<int32_t*>(samples.data());
         if (this_microphone->pcm_data_callbacks_.size() > 0) {
-          this_microphone->pcm_data_callbacks_.call(samples);
+          this_microphone->pcm_data_callbacks_.call(samples_32);
         }
         if (this_microphone->data_callbacks_.size() == 0) {
           continue;
         }
-        size_t samples_read = bytes_read / sizeof(int32_t);
-        int32_t* samples_32 = reinterpret_cast<int32_t*>(samples.data());
         for (size_t i = 0; i < samples_read; i += 3) {
           samples_32[i / 3] = samples_32[i];
         }

@@ -27,7 +27,7 @@ class Sat1Microphone : public I2SAudioIn, public microphone::Microphone, public 
 
   void loop() override;
 
-  void add_pcm_data_callback(std::function<void(const std::vector<uint8_t> &)> &&pcm_data_callback);
+  void add_pcm_data_callback(std::function<void(const std::vector<int32_t> &)> &&pcm_data_callback);
 
   void set_correct_dc_offset(bool correct_dc_offset) { this->correct_dc_offset_ = correct_dc_offset; }
 
@@ -57,7 +57,7 @@ class Sat1Microphone : public I2SAudioIn, public microphone::Microphone, public 
   bool correct_dc_offset_;
   int32_t dc_offset_{0};
 
-  CallbackManager<void(const std::vector<uint8_t> &)> pcm_data_callbacks_{};
+  CallbackManager<void(const std::vector<int32_t> &)> pcm_data_callbacks_{};
 };
 
 
