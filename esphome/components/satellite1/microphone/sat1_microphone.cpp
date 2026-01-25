@@ -296,8 +296,6 @@ void Sat1Microphone::mic_task(void *params) {
         size_t bytes_read = this_microphone->read_(samples.data(), bytes_to_read, buffer_size);
         size_t samples_read = bytes_read / sizeof(int32_t);
         int32_t* samples_32 = reinterpret_cast<int32_t*>(samples.data());
-        auto &buffer = this_microphone->buffer_;
-        buffer.insert(buffer.end(), samples_32, samples_32 + samples_read);
         if (this_microphone->pcm_data_callbacks_.size() > 0) {
           AudioBatch* batch = nullptr;
 
