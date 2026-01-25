@@ -145,7 +145,7 @@ void Sat1Microphone::loop() {
             TASK_STACK_SIZE,          // stack size
             this,
             TASK_PRIORITY - 5,             // priority (lower than mic task)
-            this->pcm_task_handle_
+            &this->pcm_task_handle_
         );
         if (this->pcm_task_handle_ == nullptr) {
           this->status_momentary_error("PCM task failed to start, ignoring.", 10);
@@ -278,7 +278,7 @@ void Sat1Microphone::pcm_worker_task(void *params) {
       if (mic->pcm_data_callbacks_.size() > 0) {
         // Call callbacks
         mic->pcm_data_callbacks_.call(*batch);
-      }µ
+      }
 
       // Free memory
       delete batch;
