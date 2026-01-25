@@ -162,7 +162,7 @@ async def to_code(config):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var)
         await automation.build_automation(
             trigger,
-            [(cg.std_vector.template(cg.uint32).operator("ref").operator("const"), "x")],
+            [(cg.std_vector.template(cg.int32).operator("ref").operator("const"), "x")],
             conf,
         )
 
