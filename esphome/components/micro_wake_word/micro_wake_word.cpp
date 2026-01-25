@@ -19,6 +19,7 @@ namespace micro_wake_word {
 static const char *const TAG = "micro_wake_word";
 
 static const ssize_t DETECTION_QUEUE_LENGTH = 5;
+static const ssize_t AUDIO_DATA_QUEUE_LENGTH = 3;
 
 static const size_t DATA_TIMEOUT_MS = 50;
 
