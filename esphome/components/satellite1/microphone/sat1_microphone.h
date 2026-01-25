@@ -66,6 +66,7 @@ class Sat1Microphone : public I2SAudioIn, public microphone::Microphone, public 
   TaskHandle_t pcm_task_handle_{nullptr};
   bool correct_dc_offset_;
   int32_t dc_offset_{0};
+  bool rx_started_{false};
   QueueHandle_t free_queue_;
   QueueHandle_t filled_queue_;
   AudioBatch pool_[POOL_SIZE];

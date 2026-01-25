@@ -128,7 +128,7 @@ void Sat1Microphone::loop() {
 
       if (!this->start_driver_()) {
         this->status_momentary_error("I2S driver failed to start, unloading it and attempting again in 1 second", 1000);
-        this->stop_driver_();  // Stop/frees whatever possibly started
+        // this->stop_driver_();  // Stop/frees whatever possibly started
         break;
       }
 
@@ -202,11 +202,15 @@ bool Sat1Microphone::start_driver_() {
     ESP_LOGE(TAG, "Failed to start I2S channel");
     return false;
   }
+  this->rx_started_ = true;
   this->configure_stream_settings_();  // redetermine the settings in case some settings were changed after compilation
   return true;
 }
 
 bool Sat1Microphone::stop_driver_() {
+  if (!this->rx_started_) {
+    return true;
+  }
   return this->stop_i2s_channel_();
 }
 
