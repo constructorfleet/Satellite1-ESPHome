@@ -111,10 +111,6 @@ class MicroWakeWord : public Component
   static void inference_task(void *params);
   TaskHandle_t inference_task_handle_{nullptr};
 
-  static void audio_data_task(void *params);
-  QueueHandle_t audio_data_queue_;
-  TaskHandle_t audio_data_task_handle_{nullptr};
-
   /// @brief Suspends the inference task
   void suspend_task_();
   /// @brief Resumes the inference task

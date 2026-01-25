@@ -19,7 +19,6 @@ namespace micro_wake_word {
 static const char *const TAG = "micro_wake_word";
 
 static const ssize_t DETECTION_QUEUE_LENGTH = 5;
-static const ssize_t AUDIO_DATA_QUEUE_LENGTH = 3;
 
 static const size_t DATA_TIMEOUT_MS = 50;
 
@@ -27,9 +26,6 @@ static const uint32_t RING_BUFFER_DURATION_MS = 120;
 
 static const uint32_t INFERENCE_TASK_STACK_SIZE = 3072;
 static const UBaseType_t INFERENCE_TASK_PRIORITY = 11;
-
-static const uint32_t AUDIO_DATA_TASK_STACK_SIZE = 3072;
-static const UBaseType_t AUDIO_DATA_TASK_PRIORITY = 5;
 
 enum EventGroupBits : uint32_t {
   COMMAND_STOP = (1 << 0),  // Signals the inference task should stop
@@ -115,13 +111,6 @@ void MicroWakeWord::setup() {
     return;
   }
 
-  this->audio_data_queue_ = xQueueCreate(AUDIO_DATA_QUEUE_LENGTH, sizeof(std::vector<uint8_t>));
-  if (this->audio_data_queue_ == nullptr) {
-    ESP_LOGE(TAG, "Failed to create audio data queue");
-    this->mark_failed();
-    return;
-  }
-
   this->microphone_source_->add_data_callback([this](const std::vector<uint8_t> &data) {
     if (this->state_ == State::STOPPED) {
       return;
@@ -155,19 +144,6 @@ void MicroWakeWord::on_ota_global_state(ota::OTAState state, float progress, uin
   }
 }
 #endif
-
-void MicroWakeWord::audio_data_task(void *params) {
-    MicroWakeWord *this_mww = (MicroWakeWord *) params;
-
-    while(true) {
-        std::vector<uint8_t>* buffer = nullptr;
-        if (xQueueReceive(this_mww->audio_data_queue_, &buffer, portMAX_DELAY) == pdTRUE) {
-            if (this_mww->audio_data_callbacks_.size() > 0) {
-                this_mww->audio_data_callbacks_.call(*buffer);
-            }
-        }
-    }
-}
 
 void MicroWakeWord::inference_task(void *params) {
   MicroWakeWord *this_mww = (MicroWakeWord *) params;
@@ -266,18 +242,11 @@ void MicroWakeWord::suspend_task_() {
   if (this->inference_task_handle_ != nullptr) {
     vTaskSuspend(this->inference_task_handle_);
   }
-  if (this->audio_data_task_handle_ != nullptr) {
-    vTaskSuspend(this->audio_data_task_handle_);
-  }
 }
 
 void MicroWakeWord::resume_task_() {
   if (this->inference_task_handle_ != nullptr) {
     vTaskResume(this->inference_task_handle_);
-  }
-
-  if (this->audio_data_task_handle_ != nullptr) {
-    vTaskResume(this->audio_data_task_handle_);
   }
 }
 
@@ -326,10 +295,6 @@ void MicroWakeWord::loop() {
     this->set_state_(State::STOPPED);
   }
 
-  vTaskDelete(this->audio_data_task_handle_);
-  this->audio_data_task_handle_ = nullptr;
-  xQueueReset(this->audio_data_queue_);
-
   if ((this->pending_start_) && (this->state_ == State::STOPPED)) {
     this->set_state_(State::STARTING);
     this->pending_start_ = false;
@@ -357,13 +322,6 @@ void MicroWakeWord::loop() {
         if (this->inference_task_handle_ == nullptr) {
           FrontendFreeStateContents(&this->frontend_state_);  // Deallocate frontend state
           this->status_momentary_error("task_start", 1000);
-        }
-      }
-      if ((this->audio_data_task_handle_ == nullptr) && !this->status_has_error()) { {
-        xTaskCreatePinnedToCore(MicroWakeWord::audio_data_task, "mww_audio", AUDIO_DATA_TASK_STACK_SIZE, (void *) this,
-                    AUDIO_DATA_TASK_PRIORITY, &this->audio_data_task_handle_, 1);
-        if (this->audio_data_task_handle_ == nullptr) {
-          this->status_momentary_error("audio_data_task_start", 1000);
         }
       }
       break;
