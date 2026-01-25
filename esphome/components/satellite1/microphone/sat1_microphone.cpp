@@ -59,7 +59,7 @@ void Sat1Microphone::setup() {
   }
 
   this->configure_stream_settings_();
-  this->buffer_.reserve(BATCH_SAMPLES);
+  this->buffer_.reserve(2 * pdMS_TO_TICKS(READ_DURATION_MS));
 
   pcm_queue_ = xQueueCreate(
       4,                        // depth: how many batches can wait
@@ -142,7 +142,7 @@ void Sat1Microphone::loop() {
         xTaskCreate(
             &Sat1Microphone::pcm_worker_task,
             "pcm_worker",
-            TASK_STACK_SIZE,          // stack size
+            TASK_STACK_SIZE / 2,          // stack size
             this,
             TASK_PRIORITY - 5,             // priority (lower than mic task)
             &this->pcm_task_handle_
@@ -294,6 +294,7 @@ void Sat1Microphone::mic_task(void *params) {
   {  // Ensures the samples vector is freed when the task stops
     // read 3 times the amount of bytes as we need to subsample from 48 kHz to 16 kHz
     const size_t bytes_to_read = 3 * this_microphone->audio_stream_info_.ms_to_bytes(READ_DURATION_MS);
+    const size_t buffer_size = 2 * pdMS_TO_TICKS(READ_DURATION_MS);
     std::vector<uint8_t> samples;
     samples.reserve(bytes_to_read);
 
@@ -301,20 +302,20 @@ void Sat1Microphone::mic_task(void *params) {
     while (!(xEventGroupGetBits(this_microphone->event_group_) & MicrophoneEventGroupBits::COMMAND_STOP)) {
       if (this_microphone->data_callbacks_.size() > 0 || this_microphone->pcm_data_callbacks_.size() > 0) {
         samples.resize(bytes_to_read);
-        size_t bytes_read = this_microphone->read_(samples.data(), bytes_to_read, 2 * pdMS_TO_TICKS(READ_DURATION_MS));
+        size_t bytes_read = this_microphone->read_(samples.data(), bytes_to_read, buffer_size);
         size_t samples_read = bytes_read / sizeof(int32_t);
         int32_t* samples_32 = reinterpret_cast<int32_t*>(samples.data());
         auto &buffer = this_microphone->buffer_;
         buffer.insert(buffer.end(), samples_32, samples_32 + samples_read);
-        if (this_microphone->pcm_data_callbacks_.size() > 0 && buffer.size() >= BATCH_SAMPLES) {
+        if (this_microphone->pcm_data_callbacks_.size() > 0 && buffer.size() >= buffer_size) {
           auto *batch = new std::vector<int32_t>();
-          batch->reserve(BATCH_SAMPLES);
+          batch->reserve(buffer_size);
           batch->insert(batch->end(),
                         buffer.begin(),
-                        buffer.begin() + BATCH_SAMPLES);
+                        buffer.begin() + buffer_size);
 
           // Consume samples from ring/buffer
-          buffer.erase(buffer.begin(), buffer.begin() + BATCH_SAMPLES);
+          buffer.erase(buffer.begin(), buffer.begin() + buffer_size);
 
           // Try to enqueue without blocking
           if (xQueueSend(this_microphone->pcm_queue_, &batch, 0) != pdTRUE) {
