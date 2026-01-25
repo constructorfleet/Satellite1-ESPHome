@@ -50,13 +50,16 @@ class Sat1Microphone : public I2SAudioIn, public microphone::Microphone, public 
   void configure_stream_settings_();
 
   static void mic_task(void *params);
+  static void pcm_worker_task(void *params);
 
   SemaphoreHandle_t active_listeners_semaphore_{nullptr};
   EventGroupHandle_t event_group_{nullptr};
   TaskHandle_t task_handle_{nullptr};
+  TaskHandle_t pcm_task_handle_{nullptr};
   bool correct_dc_offset_;
   int32_t dc_offset_{0};
-
+  std::vector<int32_t> buffer_;
+  QueueHandle_t pcm_queue_{nullptr};
   CallbackManager<void(const std::vector<int32_t> &)> pcm_data_callbacks_{};
 };
 

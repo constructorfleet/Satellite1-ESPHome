@@ -11,6 +11,7 @@ namespace i2s_audio {
 
 static const size_t RING_BUFFER_LENGTH = 60;  // Measured in milliseconds
 static const size_t QUEUE_LENGTH = 10;
+static const size_t BATCH_SAMPLES = 48000 * 2;
 
 static const UBaseType_t MAX_LISTENERS = 16;
 
@@ -58,6 +59,18 @@ void Sat1Microphone::setup() {
   }
 
   this->configure_stream_settings_();
+  this->buffer_.reserve(BATCH_SAMPLES);
+
+  pcm_queue_ = xQueueCreate(
+      4,                        // depth: how many batches can wait
+      sizeof(std::vector<int32_t> *)
+  );
+
+  if (pcm_queue_ == nullptr) {
+    ESP_LOGE(TAG, "Failed to create PCM queue");
+    this->mark_failed();
+    return;
+  }
 }
 
 void Sat1Microphone::start() {
@@ -123,6 +136,20 @@ void Sat1Microphone::loop() {
         this->status_momentary_error("I2S driver failed to start, unloading it and attempting again in 1 second", 1000);
         this->stop_driver_();  // Stop/frees whatever possibly started
         break;
+      }
+
+      if (this->pcm_task_handle_ == nullptr) {
+        xTaskCreate(
+            &Sat1Microphone::pcm_worker_task,
+            "pcm_worker",
+            TASK_STACK_SIZE,          // stack size
+            this,
+            TASK_PRIORITY - 5,             // priority (lower than mic task)
+            this->pcm_task_handle_
+        );
+        if (this->pcm_task_handle_ == nullptr) {
+          this->status_momentary_error("PCM task failed to start, ignoring.", 10);
+        }
       }
 
       if (this->task_handle_ == nullptr) {
@@ -240,6 +267,26 @@ void Sat1Microphone::fix_dc_offset_(std::vector<uint8_t> &data) {
 }
 
 
+void Sat1Microphone::pcm_worker_task(void *params) {
+  Sat1Microphone *mic = static_cast<Sat1Microphone *>(params);
+
+  while (true) {
+    std::vector<int32_t> *batch = nullptr;
+
+    // Block until audio arrives
+    if (xQueueReceive(mic->pcm_queue_, &batch, portMAX_DELAY) == pdTRUE) {
+      if (mic->pcm_data_callbacks_.size() > 0) {
+        // Call callbacks
+        mic->pcm_data_callbacks_.call(*batch);
+      }µ
+
+      // Free memory
+      delete batch;
+    }
+  }
+}
+
+
 void Sat1Microphone::mic_task(void *params) {
   Sat1Microphone *this_microphone = (Sat1Microphone *) params;
   xEventGroupSetBits(this_microphone->event_group_, MicrophoneEventGroupBits::TASK_STARTING);
@@ -257,8 +304,24 @@ void Sat1Microphone::mic_task(void *params) {
         size_t bytes_read = this_microphone->read_(samples.data(), bytes_to_read, 2 * pdMS_TO_TICKS(READ_DURATION_MS));
         size_t samples_read = bytes_read / sizeof(int32_t);
         int32_t* samples_32 = reinterpret_cast<int32_t*>(samples.data());
-        if (this_microphone->pcm_data_callbacks_.size() > 0) {
-          this_microphone->pcm_data_callbacks_.call(samples_32);
+        auto &buffer = this_microphone->buffer_;
+        buffer.insert(buffer.end(), samples_32, samples_32 + samples_read);
+        this_microphone->buffer_.insert(this->buffer_->end(), samples_32, samples_32 + samples_read);
+        if (this_microphone->pcm_data_callbacks_.size() > 0 && this->buffer_.size() >= BATCH_SAMPLES) {
+          auto *batch = new std::vector<int32_t>();
+          batch->reserve(BATCH_SAMPLES);
+          batch->insert(batch->end(),
+                        buffer.begin(),
+                        buffer.begin() + BATCH_SAMPLES);
+
+          // Consume samples from ring/buffer
+          buffer.erase(buffer.begin(), buffer.begin() + BATCH_SAMPLES);
+
+          // Try to enqueue without blocking
+          if (xQueueSend(this_microphone->pcm_queue_, &batch, 0) != pdTRUE) {
+            // Queue full: drop batch, do NOT block
+            delete batch;
+          }
         }
         if (this_microphone->data_callbacks_.size() == 0) {
           continue;
