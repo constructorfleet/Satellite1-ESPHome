@@ -8,7 +8,7 @@
 namespace esphome {
 namespace i2s_audio {
 
-class PCMDataTrigger : public Trigger<const int32_t, size_t> {
+class PCMDataTrigger : public Trigger<const int32_t*, size_t> {
  public:
   explicit PCMDataTrigger(Sat1Microphone *mic) {
     mic->add_pcm_data_callback(
