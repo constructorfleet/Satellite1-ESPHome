@@ -1,6 +1,7 @@
 from esphome import pins, automation
 import esphome.codegen as cg
 from esphome.components import audio, esp32, microphone
+from esphome.cpp_generator import MockObj
 from esphome.components.adc import ESP32_VARIANT_ADC1_PIN_TO_CHANNEL, validate_adc_pin
 import esphome.config_validation as cv
 from esphome.const import (
@@ -34,9 +35,12 @@ CONF_ADC_TYPE = "adc_type"
 CONF_CORRECT_DC_OFFSET = "correct_dc_offset"
 CONF_PDM = "pdm"
 CONF_ON_PCM_DATA = "on_pcm_data"
+
+global_ns = MockObj("", "")
+const_ptr = 
 PCMDataTrigger = i2s_audio_ns.class_(
     "PCMDataTrigger",
-    automation.Trigger.template(cg.int32.operator("const_ptr"), cg.size_t),
+    automation.Trigger.template(cMockObj(f"const int32_t*", ""), cg.size_t),
 )
 
 
