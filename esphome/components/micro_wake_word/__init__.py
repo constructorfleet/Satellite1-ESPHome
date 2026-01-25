@@ -535,9 +535,7 @@ async def to_code(config):
                 trigger,
                 [
                     (
-                        cg.std_vector.template(cg.uint8)
-                        .operator("ref")
-                        .operator("const"),
+                        cg.std_vector.template(cg.uint8).operator("ref"),
                         "x",
                     )
                 ],
