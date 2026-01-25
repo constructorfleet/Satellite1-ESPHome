@@ -77,12 +77,8 @@ void MicroWakeWord::dump_config() {
 
 void MicroWakeWord::add_audio_data_callback(std::function<void(const std::vector<uint8_t> &)> callback) {
     std::function<void(const std::vector<uint8_t> &)> mute_handled_callback =
-      [this, pcm_data_callback](const std::vector<uint8_t> &data) {
-        if (this->mute_state_) {
-            return;
-        } else {
-          callback(data);
-        };
+      [this, callback](const std::vector<uint8_t> &data) {
+        callback(data);
       };
   this->audio_data_callbacks_.add(std::move(mute_handled_callback));
 }
