@@ -61,6 +61,7 @@ class MicroWakeWord : public Component
   void set_stop_after_detection(bool stop_after_detection) { this->stop_after_detection_ = stop_after_detection; }
 
   Trigger<std::string> *get_wake_word_detected_trigger() const { return this->wake_word_detected_trigger_; }
+  void add_audio_data_callback(std::function<void(const std::vector<uint8_t> &)> callback);
 
   void add_wake_word_model(WakeWordModel *model);
 
@@ -79,6 +80,7 @@ class MicroWakeWord : public Component
  protected:
   microphone::MicrophoneSource *microphone_source_{nullptr};
   Trigger<std::string> *wake_word_detected_trigger_ = new Trigger<std::string>();
+  CallbackManager<void(const std::vector<uint8_t> &)> audio_data_callbacks_{};
   State state_{State::STOPPED};
 
   std::weak_ptr<RingBuffer> ring_buffer_;
@@ -108,6 +110,10 @@ class MicroWakeWord : public Component
 
   static void inference_task(void *params);
   TaskHandle_t inference_task_handle_{nullptr};
+
+  static void audio_data_task(void *params);
+  QueueHandle_t audio_data_queue_;
+  TaskHandle_t audio_data_task_handle_{nullptr};
 
   /// @brief Suspends the inference task
   void suspend_task_();

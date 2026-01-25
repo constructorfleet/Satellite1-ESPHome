@@ -27,6 +27,9 @@ static const uint32_t RING_BUFFER_DURATION_MS = 120;
 static const uint32_t INFERENCE_TASK_STACK_SIZE = 3072;
 static const UBaseType_t INFERENCE_TASK_PRIORITY = 11;
 
+static const uint32_t AUDIO_DATA_TASK_STACK_SIZE = 3072;
+static const UBaseType_t AUDIO_DATA_TASK_PRIORITY = 5;
+
 enum EventGroupBits : uint32_t {
   COMMAND_STOP = (1 << 0),  // Signals the inference task should stop
 
@@ -72,6 +75,18 @@ void MicroWakeWord::dump_config() {
 #endif
 }
 
+void MicroWakeWord::add_audio_data_callback(std::function<void(const std::vector<uint8_t> &)> callback) {
+    std::function<void(const std::vector<uint8_t> &)> mute_handled_callback =
+      [this, pcm_data_callback](const std::vector<uint8_t> &data) {
+        if (this->mute_state_) {
+            return;
+        } else {
+          callback(data);
+        };
+      };
+  this->audio_data_callbacks_.add(std::move(mute_handled_callback));
+}
+
 void MicroWakeWord::setup() {
   this->frontend_config_.window.size_ms = FEATURE_DURATION_MS;
   this->frontend_config_.window.step_size_ms = this->features_step_size_;
@@ -103,6 +118,13 @@ void MicroWakeWord::setup() {
     return;
   }
 
+  this->audio_data_queue_ = xQueueCreate(AUDIO_DATA_QUEUE_LENGTH, sizeof(std::vector<uint8_t>));
+  if (this->audio_data_queue_ == nullptr) {
+    ESP_LOGE(TAG, "Failed to create audio data queue");
+    this->mark_failed();
+    return;
+  }
+
   this->microphone_source_->add_data_callback([this](const std::vector<uint8_t> &data) {
     if (this->state_ == State::STOPPED) {
       return;
@@ -116,6 +138,9 @@ void MicroWakeWord::setup() {
         temp_ring_buffer->reset();
       }
       temp_ring_buffer->write((void *) data.data(), data.size());
+      if(this->audio_data_callbacks_.size() > 0) {
+        this->audio_data_callbacks_.call(data);
+      }
     }
   });
 
@@ -133,6 +158,19 @@ void MicroWakeWord::on_ota_global_state(ota::OTAState state, float progress, uin
   }
 }
 #endif
+
+void MicroWakeWord::audio_data_task(void *params) {
+    MicroWakeWord *this_mww = (MicroWakeWord *) params;
+
+    while(true) {
+        std::vector<uint8_t>* buffer = nullptr;
+        if (xQueueReceive(this_mww->audio_data_queue_, &buffer, portMAX_DELAY) == pdTRUE) {
+            if (this_mww->audio_data_callbacks_.size()) > 0 {
+                this_mww->audio_data_callbacks_.call(buffer);
+            }
+        }
+    }
+}
 
 void MicroWakeWord::inference_task(void *params) {
   MicroWakeWord *this_mww = (MicroWakeWord *) params;
@@ -231,11 +269,18 @@ void MicroWakeWord::suspend_task_() {
   if (this->inference_task_handle_ != nullptr) {
     vTaskSuspend(this->inference_task_handle_);
   }
+  if (this->audio_data_task_handle_ != nullptr) {
+    vTaskSuspend(this->audio_data_task_handle_);
+  }
 }
 
 void MicroWakeWord::resume_task_() {
   if (this->inference_task_handle_ != nullptr) {
     vTaskResume(this->inference_task_handle_);
+  }
+
+  if (this->audio_data_task_handle_ != nullptr) {
+    vTaskResume(this->audio_data_task_handle_);
   }
 }
 
@@ -284,6 +329,10 @@ void MicroWakeWord::loop() {
     this->set_state_(State::STOPPED);
   }
 
+  vTaskDelete(this->audio_data_task_handle_);
+  this->audio_data_task_handle_ = nullptr;
+  xQueueReset(this->audio_data_queue_);
+
   if ((this->pending_start_) && (this->state_ == State::STOPPED)) {
     this->set_state_(State::STARTING);
     this->pending_start_ = false;
@@ -311,6 +360,13 @@ void MicroWakeWord::loop() {
         if (this->inference_task_handle_ == nullptr) {
           FrontendFreeStateContents(&this->frontend_state_);  // Deallocate frontend state
           this->status_momentary_error("task_start", 1000);
+        }
+      }
+      if ((this->audio_data_task_handle_ == nullptr) && !this->status_has_error()) { {
+        xTaskCreatePinnedToCore(MicroWakeWord::audio_data_task, "mww_audio", AUDIO_DATA_TASK_STACK_SIZE, (void *) this,
+                    AUDIO_DATA_TASK_PRIORITY, &this->audio_data_task_handle_, 1);
+        if (this->audio_data_task_handle_ == nullptr) {
+          this->status_momentary_error("audio_data_task_start", 1000);
         }
       }
       break;
