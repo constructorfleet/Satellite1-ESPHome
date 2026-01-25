@@ -11,7 +11,6 @@ namespace i2s_audio {
 
 static const size_t RING_BUFFER_LENGTH = 60;  // Measured in milliseconds
 static const size_t QUEUE_LENGTH = 10;
-static const size_t BATCH_SAMPLES = 48000 * 2;
 
 static const UBaseType_t MAX_LISTENERS = 16;
 
@@ -59,17 +58,12 @@ void Sat1Microphone::setup() {
   }
 
   this->configure_stream_settings_();
-  this->buffer_.reserve(2 * pdMS_TO_TICKS(READ_DURATION_MS));
+  this->free_queue_   = xQueueCreate(POOL_SIZE, sizeof(AudioBatch*));
+  this->filled_queue_ = xQueueCreate(POOL_SIZE, sizeof(AudioBatch*));
 
-  pcm_queue_ = xQueueCreate(
-      4,                        // depth: how many batches can wait
-      sizeof(std::vector<int32_t> *)
-  );
-
-  if (pcm_queue_ == nullptr) {
-    ESP_LOGE(TAG, "Failed to create PCM queue");
-    this->mark_failed();
-    return;
+  for (int i = 0; i < POOL_SIZE; i++) {
+    AudioBatch* b = &this->pool_[i];
+    xQueueSend(this->free_queue_, &b, 0);
   }
 }
 
@@ -271,17 +265,14 @@ void Sat1Microphone::pcm_worker_task(void *params) {
   Sat1Microphone *mic = static_cast<Sat1Microphone *>(params);
 
   while (true) {
-    std::vector<int32_t> *batch = nullptr;
+    AudioBatch* batch = nullptr;
 
-    // Block until audio arrives
-    if (xQueueReceive(mic->pcm_queue_, &batch, portMAX_DELAY) == pdTRUE) {
+    if (xQueueReceive(mic->filled_queue_, &batch, portMAX_DELAY) == pdTRUE) {
       if (mic->pcm_data_callbacks_.size() > 0) {
-        // Call callbacks
+        // process(batch->data, batch->count);
         mic->pcm_data_callbacks_.call(*batch);
       }
-
-      // Free memory
-      delete batch;
+      xQueueSend(mic->free_queue_, &batch, 0); // return to pool
     }
   }
 }
@@ -307,20 +298,13 @@ void Sat1Microphone::mic_task(void *params) {
         int32_t* samples_32 = reinterpret_cast<int32_t*>(samples.data());
         auto &buffer = this_microphone->buffer_;
         buffer.insert(buffer.end(), samples_32, samples_32 + samples_read);
-        if (this_microphone->pcm_data_callbacks_.size() > 0 && buffer.size() >= buffer_size) {
-          auto *batch = new std::vector<int32_t>();
-          batch->reserve(buffer_size);
-          batch->insert(batch->end(),
-                        buffer.begin(),
-                        buffer.begin() + buffer_size);
+        if (this_microphone->pcm_data_callbacks_.size() > 0) {
+          AudioBatch* batch = nullptr;
 
-          // Consume samples from ring/buffer
-          buffer.erase(buffer.begin(), buffer.begin() + buffer_size);
-
-          // Try to enqueue without blocking
-          if (xQueueSend(this_microphone->pcm_queue_, &batch, 0) != pdTRUE) {
-            // Queue full: drop batch, do NOT block
-            delete batch;
+          if (xQueueReceive(this_microphone->free_queue_, &batch, 0) == pdTRUE) {
+            batch->count = samples_read;
+            memcpy(batch->data, samples_32, samples_read * sizeof(int32_t));
+            xQueueSend(this_microphone->filled_queue_, &batch, 0);
           }
         }
         if (this_microphone->data_callbacks_.size() == 0) {

@@ -18,6 +18,14 @@
 namespace esphome {
 namespace i2s_audio {
 
+constexpr size_t BATCH_SAMPLES = 4096 * 2;
+constexpr size_t POOL_SIZE = 4;
+
+struct AudioBatch {
+  size_t count;
+  int32_t data[BATCH_SAMPLES];
+};
+
 class Sat1Microphone : public I2SAudioIn, public microphone::Microphone, public Component {
  public:
   void setup() override;
@@ -27,7 +35,7 @@ class Sat1Microphone : public I2SAudioIn, public microphone::Microphone, public 
 
   void loop() override;
 
-  void add_pcm_data_callback(std::function<void(const std::vector<int32_t> &)> &&pcm_data_callback);
+  void add_pcm_data_callback(std::function<void(const int32_t, size_t)> &&pcm_data_callback);
 
   void set_correct_dc_offset(bool correct_dc_offset) { this->correct_dc_offset_ = correct_dc_offset; }
 
@@ -58,9 +66,10 @@ class Sat1Microphone : public I2SAudioIn, public microphone::Microphone, public 
   TaskHandle_t pcm_task_handle_{nullptr};
   bool correct_dc_offset_;
   int32_t dc_offset_{0};
-  std::vector<int32_t> buffer_;
-  QueueHandle_t pcm_queue_{nullptr};
-  CallbackManager<void(const std::vector<int32_t> &)> pcm_data_callbacks_{};
+  QueueHandle_t free_queue_;
+  QueueHandle_t filled_queue_;
+  AudioBatch pool_[POOL_SIZE];
+  CallbackManager<void(const int32_t*, size_t)> pcm_data_callbacks_{};
 };
 
 
