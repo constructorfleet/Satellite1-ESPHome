@@ -147,7 +147,7 @@ void Sat1Microphone::loop() {
       }
 
       if (this->task_handle_ == nullptr) {
-        xTaskCreate(Sat1Microphone::mic_task, "mic_task", TASK_STACK_SIZE, (void *) this, TASK_PRIORITY,
+        xTaskCreate(Sat1Microphone::mic_task, "mic_task", TASK_STACK_SIZE * 2, (void *) this, TASK_PRIORITY,
                     &this->task_handle_);
 
         if (this->task_handle_ == nullptr) {
@@ -171,7 +171,7 @@ void Sat1Microphone::add_pcm_data_callback(std::function<void(const int32_t*, si
   std::function<void(const int32_t*, size_t)> mute_handled_callback =
       [this, pcm_data_callback](const int32_t* data, size_t size) {
         if (this->mute_state_) {
-          pcm_data_callback(0, size);
+          pcm_data_callback(data, 0);
         } else {
           pcm_data_callback(data, size);
         };
@@ -272,8 +272,8 @@ void Sat1Microphone::pcm_worker_task(void *params) {
         // process(batch->data, batch->count);
         mic->pcm_data_callbacks_.call(batch->data, batch->count);
       }
-      xQueueSend(mic->free_queue_, &batch, 0); // return to pool
     }
+    xQueueSend(mic->free_queue_, &batch, 0); // return to pool
   }
 }
 
@@ -300,9 +300,13 @@ void Sat1Microphone::mic_task(void *params) {
           AudioBatch* batch = nullptr;
 
           if (xQueueReceive(this_microphone->free_queue_, &batch, 0) == pdTRUE) {
-            batch->count = samples_read;
-            memcpy(batch->data, samples_32, samples_read * sizeof(int32_t));
-            xQueueSend(this_microphone->filled_queue_, &batch, 0);
+            size_t n = samples_read;
+            if (n > BATCH_SAMPLES) n = BATCH_SAMPLES;
+            batch->count = n;
+            memcpy(batch->data, samples_32, n * sizeof(int32_t));
+            if (xQueueSend(this_microphone->filled_queue_, &batch, 0) != pdTRUE) {
+              xQueueSend(this_microphone->free_queue_, &batch, 0);
+            }
           }
         }
         if (this_microphone->data_callbacks_.size() == 0) {
