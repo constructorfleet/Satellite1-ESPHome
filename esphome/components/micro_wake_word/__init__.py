@@ -70,7 +70,7 @@ WakeWordModel = micro_wake_word_ns.class_("WakeWordModel")
 
 AudioDataTrigger = micro_wake_word_ns.class_(
     "AudioDataTrigger",
-    automation.Trigger.template(cg.std_vector(cg.uint8).operator("ref")),
+    automation.Trigger.template(cg.std_vector.template(cg.uint8).operator("ref")),
 )
 
 
