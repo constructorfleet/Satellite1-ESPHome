@@ -38,7 +38,7 @@ CONF_ON_PCM_DATA = "on_pcm_data"
 
 PCMDataTrigger = i2s_audio_ns.class_(
     "PCMDataTrigger",
-    automation.Trigger.template(cMockObj(f"const int32_t*", ""), cg.size_t),
+    automation.Trigger.template(MockObj(f"const int32_t*", ""), cg.size_t),
 )
 
 
