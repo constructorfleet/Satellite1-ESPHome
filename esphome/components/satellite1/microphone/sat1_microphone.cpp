@@ -270,7 +270,7 @@ void Sat1Microphone::pcm_worker_task(void *params) {
     if (xQueueReceive(mic->filled_queue_, &batch, portMAX_DELAY) == pdTRUE) {
       if (mic->pcm_data_callbacks_.size() > 0) {
         // process(batch->data, batch->count);
-        mic->pcm_data_callbacks_.call(*batch);
+        mic->pcm_data_callbacks_.call(batch->data, batch->count);
       }
       xQueueSend(mic->free_queue_, &batch, 0); // return to pool
     }
