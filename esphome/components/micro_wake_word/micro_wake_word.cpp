@@ -393,6 +393,7 @@ void MicroWakeWord::loop() {
       break;
   }
 }
+}
 
 void MicroWakeWord::start() {
   if (!this->is_ready()) {
