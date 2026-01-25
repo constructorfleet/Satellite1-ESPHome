@@ -227,6 +227,8 @@ protected:
   i2s_role_t i2s_role_{};
   i2s_chan_handle_t tx_handle_{nullptr};
   i2s_chan_handle_t rx_handle_{nullptr};
+  bool tx_enabled_{false};
+  bool rx_enabled_{false};
   int mclk_pin_{I2S_GPIO_UNUSED};
   int bclk_pin_{I2S_GPIO_UNUSED};
   int dout_pin_{I2S_GPIO_UNUSED};

@@ -252,20 +252,22 @@ bool I2SPortComponent::init_driver_(i2s_std_config_t std_cfg) {
     this->unlock();
     return false;
   }
-  
-  if( this->tx_handle_ ){
-    err = i2s_channel_init_std_mode(this->tx_handle_, &std_cfg);
-    if (err != ESP_OK) {
-      i2s_del_channel(this->tx_handle_);
-      this->unlock();
-      return false;
-    }
-  }
+  this->tx_enabled_ = false;
+  this->rx_enabled_ = false;
   
   if( this->rx_handle_ ){
     err = i2s_channel_init_std_mode(this->rx_handle_, &std_cfg);
     if (err != ESP_OK) {
       i2s_del_channel(this->rx_handle_);
+      this->unlock();
+      return false;
+    }
+  }
+
+  if( this->tx_handle_ ){
+    err = i2s_channel_init_std_mode(this->tx_handle_, &std_cfg);
+    if (err != ESP_OK) {
+      i2s_del_channel(this->tx_handle_);
       this->unlock();
       return false;
     }
@@ -279,10 +281,6 @@ bool I2SPortComponent::init_driver_(i2s_std_config_t std_cfg) {
 bool I2SAudioOut::start_i2s_channel_(i2s_event_callbacks_t callbacks) {
 #ifndef USE_I2S_LEGACY
   if( this->parent_->tx_handle_ == nullptr ){
-    if( this->parent_->rx_handle_ != nullptr ){
-      ESP_LOGE(TAG, "Trying to start I2S-TX channel, but RX handle is available. This is not allowed.");
-      return false;
-    }
     i2s_std_config_t std_cfg = {
       .clk_cfg = this->get_std_clk_cfg(),
       .slot_cfg = this->get_std_slot_cfg(),
@@ -312,12 +310,26 @@ bool I2SAudioOut::start_i2s_channel_(i2s_event_callbacks_t callbacks) {
     }
   }
  
+  if (this->parent_->rx_handle_ != nullptr && !this->parent_->rx_enabled_) {
+    err = i2s_channel_enable(this->parent_->rx_handle_);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG, "Failed to enable RX channel before TX: %s", esp_err_to_name(err));
+      return false;
+    }
+    this->parent_->rx_enabled_ = true;
+  }
+
+  if (this->parent_->tx_enabled_) {
+    return true;
+  }
+
   err = i2s_channel_enable(this->parent_->tx_handle_);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "Failed to enable TX channel: %s", esp_err_to_name(err));
     i2s_del_channel(this->parent_->tx_handle_);
     return false;
   }
+  this->parent_->tx_enabled_ = true;
 #else
   if (!this->claim_i2s_access()) {
     return false;
@@ -351,11 +363,12 @@ bool I2SAudioOut::stop_i2s_channel_() {
     return false;
   }
   
-  esp_err_t err = i2s_channel_disable(this->parent_->tx_handle_);
+  esp_err_t err = i2s_channel_disable(this->parent_->rx_handle_);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "Failed to disable TX channel: %s", esp_err_to_name(err));
     return false;
   }
+  this->parent_->tx_enabled_ = false;
 #endif
   return true;
 }
@@ -375,10 +388,6 @@ bool I2SAudioIn::start_i2s_channel_(i2s_event_callbacks_t callbacks) {
   }
 #else
   if( this->parent_->rx_handle_ == nullptr ){
-    if( this->parent_->tx_handle_ != nullptr ){
-      ESP_LOGE(TAG, "Trying to start I2S-RX channel, but TX handle is available. This is not allowed.");
-      return false;
-    }
     i2s_std_config_t std_cfg = {
       .clk_cfg = this->get_std_clk_cfg(),
       .slot_cfg = this->get_std_slot_cfg(),
@@ -400,12 +409,15 @@ bool I2SAudioIn::start_i2s_channel_(i2s_event_callbacks_t callbacks) {
     ESP_LOGE(TAG, "RX channel is not configured for RX direction");
     return false;
   }
-  
-  err = i2s_channel_enable(this->parent_->rx_handle_);
-  if (err != ESP_OK) {
-      i2s_del_channel(this->parent_->rx_handle_);
-      return false;
-  } 
+
+  if (!this->parent_->rx_enabled_) {
+    err = i2s_channel_enable(this->parent_->rx_handle_);
+    if (err != ESP_OK) {
+        i2s_del_channel(this->parent_->rx_handle_);
+        return false;
+    }
+    this->parent_->rx_enabled_ = true;
+  }
 #endif
   return true;
 }
@@ -430,6 +442,7 @@ bool I2SAudioIn::stop_i2s_channel_() {
     ESP_LOGE(TAG, "Failed to disable RX channel: %s", esp_err_to_name(err));
     return false;
   }
+  this->parent_->rx_enabled_ = false;
 #endif
   return true;
 }
