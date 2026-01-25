@@ -36,9 +36,10 @@ CONF_CORRECT_DC_OFFSET = "correct_dc_offset"
 CONF_PDM = "pdm"
 CONF_ON_PCM_DATA = "on_pcm_data"
 
+const_int32_ptr = MockObj(f"const int32_t*", "")
 PCMDataTrigger = i2s_audio_ns.class_(
     "PCMDataTrigger",
-    automation.Trigger.template(MockObj(f"const int32_t*", ""), cg.size_t),
+    automation.Trigger.template(const_int32_ptr, cg.size_t),
 )
 
 
@@ -164,7 +165,7 @@ async def to_code(config):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var)
         await automation.build_automation(
             trigger,
-            [(cg.int32.operator("const_ptr"), "x"), (cg.size_t, "y")],
+            [(const_int32_ptr, "x"), (cg.size_t, "y")],
             conf,
         )
 
