@@ -124,10 +124,12 @@ void Sat1Microphone::loop() {
 
   switch (this->state_) {
     case microphone::STATE_STARTING:
-      if (this->status_has_error()) {
         ESP_LOGI(TAG, "free_heap=%u", (unsigned) esp_get_free_heap_size());
         ESP_LOGI(TAG, "largest_8bit=%u", (unsigned) heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
         ESP_LOGI(TAG, "largest_dma=%u", (unsigned) heap_caps_get_largest_free_block(MALLOC_CAP_DMA));
+        ESP_LOGI(TAG, "free_dma=%u", (unsigned) heap_caps_get_free_size(MALLOC_CAP_DMA));
+      if (this->status_has_error()) {
+        
         break;
       }
 
