@@ -132,6 +132,18 @@ void Sat1Microphone::loop() {
         break;
       }
 
+      if (this->task_handle_ == nullptr) {
+        xTaskCreate(Sat1Microphone::mic_task, "mic_task", TASK_STACK_SIZE, (void *) this, TASK_PRIORITY,
+                    &this->task_handle_);
+
+        if (this->task_handle_ == nullptr) {
+          this->status_momentary_error("Task failed to start, attempting again in 1 second", 1000);
+          this->stop_driver_();  // Stops the driver to return the lock; will be reloaded in next attempt
+        }
+      }
+
+      break;
+    case microphone::STATE_RUNNING:
       if (this->pcm_task_handle_ == nullptr) {
         xTaskCreate(
             &Sat1Microphone::pcm_worker_task,
@@ -145,19 +157,6 @@ void Sat1Microphone::loop() {
           this->status_momentary_error("PCM task failed to start, ignoring.", 10);
         }
       }
-
-      if (this->task_handle_ == nullptr) {
-        xTaskCreate(Sat1Microphone::mic_task, "mic_task", TASK_STACK_SIZE * 2, (void *) this, TASK_PRIORITY,
-                    &this->task_handle_);
-
-        if (this->task_handle_ == nullptr) {
-          this->status_momentary_error("Task failed to start, attempting again in 1 second", 1000);
-          this->stop_driver_();  // Stops the driver to return the lock; will be reloaded in next attempt
-        }
-      }
-
-      break;
-    case microphone::STATE_RUNNING:
       break;
     case microphone::STATE_STOPPING:
       xEventGroupSetBits(this->event_group_, MicrophoneEventGroupBits::COMMAND_STOP);
