@@ -14,7 +14,7 @@ namespace i2s_audio {
 static const uint8_t I2S_NUM_MAX = SOC_I2S_NUM;  // because IDF 5+ took this away :(
 #endif
 
-static const size_t DMA_BUFFERS_COUNT = 4;
+static const size_t DMA_BUFFERS_COUNT = 2;
 static const size_t I2S_EVENT_QUEUE_COUNT = DMA_BUFFERS_COUNT + 1;
 
 

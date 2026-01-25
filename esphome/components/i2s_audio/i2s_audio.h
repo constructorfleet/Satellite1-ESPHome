@@ -234,8 +234,8 @@ protected:
 #endif
   int lrclk_pin_;
   i2s_port_t port_{};
-  size_t dma_buffer_length_{240};
-  uint8_t dma_buffer_count_{4};
+  size_t dma_buffer_length_{60};
+  uint8_t dma_buffer_count_{2};
 
   QueueHandle_t i2s_event_queue_;
   bool driver_loaded_{false};
