@@ -305,6 +305,11 @@ void MicroWakeWord::loop() {
     this->pending_stop_ = false;
   }
 
+  if (this->microphone_source_ != nullptr) {
+    auto stream_info = this->microphone_source_->get_audio_stream_info();
+    ESP_LOGI(TAG, "Audio Info => sample_rate %d channels %d bits_per_sample %d", stream_info->get_sample_rate(), stream_info->get_channels(), stream_info->get_bits_per_sample());
+  }
+
   switch (this->state_) {
     case State::STARTING:
       if ((this->inference_task_handle_ == nullptr) && !this->status_has_error()) {
