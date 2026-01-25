@@ -541,18 +541,8 @@ async def to_code(config):
                         "x",
                     )
                 ],
+                conf,
             )
-
-        await automation.build_automation(
-            var.get_audio_data_trigger(),
-            [
-                (
-                    cg.std_vector.template(cg.uint8).operator("ref").operator("const"),
-                    "data",
-                )
-            ],
-            on_audio_data_config,
-        )
 
     if on_wake_word_detection_config := config.get(CONF_ON_WAKE_WORD_DETECTED):
         await automation.build_automation(
