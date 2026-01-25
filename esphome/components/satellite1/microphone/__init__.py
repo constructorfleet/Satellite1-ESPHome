@@ -36,8 +36,6 @@ CONF_CORRECT_DC_OFFSET = "correct_dc_offset"
 CONF_PDM = "pdm"
 CONF_ON_PCM_DATA = "on_pcm_data"
 
-global_ns = MockObj("", "")
-const_ptr = 
 PCMDataTrigger = i2s_audio_ns.class_(
     "PCMDataTrigger",
     automation.Trigger.template(cMockObj(f"const int32_t*", ""), cg.size_t),
