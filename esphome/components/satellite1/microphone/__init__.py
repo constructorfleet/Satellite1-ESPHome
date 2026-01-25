@@ -36,7 +36,7 @@ CONF_PDM = "pdm"
 CONF_ON_PCM_DATA = "on_pcm_data"
 PCMDataTrigger = i2s_audio_ns.class_(
     "PCMDataTrigger",
-    automation.Trigger.template(cg.int32.operator("const_ptr")m cg.size_t),
+    automation.Trigger.template(cg.int32.operator("const_ptr"), cg.size_t),
 )
 
 
