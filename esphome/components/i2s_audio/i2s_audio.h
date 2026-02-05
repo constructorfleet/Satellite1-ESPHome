@@ -227,6 +227,8 @@ protected:
   i2s_role_t i2s_role_{};
   i2s_chan_handle_t tx_handle_{nullptr};
   i2s_chan_handle_t rx_handle_{nullptr};
+  bool tx_enabled_{false};
+  bool rx_enabled_{false};
   int mclk_pin_{I2S_GPIO_UNUSED};
   int bclk_pin_{I2S_GPIO_UNUSED};
   int dout_pin_{I2S_GPIO_UNUSED};
@@ -234,8 +236,8 @@ protected:
 #endif
   int lrclk_pin_;
   i2s_port_t port_{};
-  size_t dma_buffer_length_{240};
-  uint8_t dma_buffer_count_{4};
+  size_t dma_buffer_length_{60};
+  uint8_t dma_buffer_count_{2};
 
   QueueHandle_t i2s_event_queue_;
   bool driver_loaded_{false};

@@ -8,6 +8,7 @@
 #include "esphome/components/i2s_audio/i2s_audio.h"
 #include "esphome/components/microphone/microphone.h"
 #include "esphome/core/component.h"
+#include "esphome/core/helpers.h"
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
@@ -17,6 +18,14 @@
 namespace esphome {
 namespace i2s_audio {
 
+constexpr size_t BATCH_SAMPLES = 4096 * 2;
+constexpr size_t POOL_SIZE = 4;
+
+struct AudioBatch {
+  size_t count;
+  int32_t data[BATCH_SAMPLES];
+};
+
 class Sat1Microphone : public I2SAudioIn, public microphone::Microphone, public Component {
  public:
   void setup() override;
@@ -25,6 +34,8 @@ class Sat1Microphone : public I2SAudioIn, public microphone::Microphone, public 
   void stop();
 
   void loop() override;
+
+  void add_pcm_data_callback(std::function<void(const int32_t*, size_t)> &&pcm_data_callback);
 
   void set_correct_dc_offset(bool correct_dc_offset) { this->correct_dc_offset_ = correct_dc_offset; }
 
@@ -47,12 +58,19 @@ class Sat1Microphone : public I2SAudioIn, public microphone::Microphone, public 
   void configure_stream_settings_();
 
   static void mic_task(void *params);
+  static void pcm_worker_task(void *params);
 
   SemaphoreHandle_t active_listeners_semaphore_{nullptr};
   EventGroupHandle_t event_group_{nullptr};
   TaskHandle_t task_handle_{nullptr};
+  TaskHandle_t pcm_task_handle_{nullptr};
   bool correct_dc_offset_;
   int32_t dc_offset_{0};
+  bool rx_started_{false};
+  QueueHandle_t free_queue_;
+  QueueHandle_t filled_queue_;
+  AudioBatch pool_[POOL_SIZE];
+  CallbackManager<void(const int32_t*, size_t)> pcm_data_callbacks_{};
 };
 
 

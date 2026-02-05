@@ -25,9 +25,9 @@ globals:
 microphone:
   - platform: satellite1
     id: sat1_mics
-    sample_rate: 48000
+    sample_rate: 16000
     i2s_din_pin: GPIO15
-    bits_per_sample: 32bit
+    bits_per_sample: 16bit
     channel: stereo
     pdm: false
     adc_type: external

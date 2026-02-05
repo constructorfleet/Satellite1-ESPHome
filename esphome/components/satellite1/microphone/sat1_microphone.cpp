@@ -5,6 +5,8 @@
 
 #include "esphome/core/hal.h"
 #include "esphome/core/log.h"
+#include <esp_heap_caps.h>
+#include <esp_system.h>
 
 namespace esphome {
 namespace i2s_audio {
@@ -58,6 +60,13 @@ void Sat1Microphone::setup() {
   }
 
   this->configure_stream_settings_();
+  this->free_queue_   = xQueueCreate(POOL_SIZE, sizeof(AudioBatch*));
+  this->filled_queue_ = xQueueCreate(POOL_SIZE, sizeof(AudioBatch*));
+
+  for (int i = 0; i < POOL_SIZE; i++) {
+    AudioBatch* b = &this->pool_[i];
+    xQueueSend(this->free_queue_, &b, 0);
+  }
 }
 
 void Sat1Microphone::start() {
@@ -113,15 +122,20 @@ void Sat1Microphone::loop() {
     this->state_ = microphone::STATE_STOPPING;
   }
 
+  ESP_LOGI(TAG, "free_heap=%u", (unsigned) esp_get_free_heap_size());
+  ESP_LOGI(TAG, "largest_8bit=%u", (unsigned) heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+  ESP_LOGI(TAG, "largest_dma=%u", (unsigned) heap_caps_get_largest_free_block(MALLOC_CAP_DMA));
+  ESP_LOGI(TAG, "free_dma=%u", (unsigned) heap_caps_get_free_size(MALLOC_CAP_DMA));
   switch (this->state_) {
     case microphone::STATE_STARTING:
       if (this->status_has_error()) {
+        
         break;
       }
 
       if (!this->start_driver_()) {
         this->status_momentary_error("I2S driver failed to start, unloading it and attempting again in 1 second", 1000);
-        this->stop_driver_();  // Stop/frees whatever possibly started
+        // this->stop_driver_();  // Stop/frees whatever possibly started
         break;
       }
 
@@ -137,6 +151,19 @@ void Sat1Microphone::loop() {
 
       break;
     case microphone::STATE_RUNNING:
+      if (this->pcm_task_handle_ == nullptr) {
+        xTaskCreate(
+            &Sat1Microphone::pcm_worker_task,
+            "pcm_worker",
+            TASK_STACK_SIZE * 2,          // stack size
+            this,
+            TASK_PRIORITY - 5,             // priority (lower than mic task)
+            &this->pcm_task_handle_
+        );
+        if (this->pcm_task_handle_ == nullptr) {
+          this->status_momentary_error("PCM task failed to start, ignoring.", 10);
+        }
+      }
       break;
     case microphone::STATE_STOPPING:
       xEventGroupSetBits(this->event_group_, MicrophoneEventGroupBits::COMMAND_STOP);
@@ -146,7 +173,17 @@ void Sat1Microphone::loop() {
   }
 }
 
-
+void Sat1Microphone::add_pcm_data_callback(std::function<void(const int32_t*, size_t)> &&pcm_data_callback) {
+  std::function<void(const int32_t*, size_t)> mute_handled_callback =
+      [this, pcm_data_callback](const int32_t* data, size_t size) {
+        if (this->mute_state_) {
+          pcm_data_callback(data, 0);
+        } else {
+          pcm_data_callback(data, size);
+        };
+      };
+  this->pcm_data_callbacks_.add(std::move(mute_handled_callback));
+}
 
 
 void Sat1Microphone::configure_stream_settings_() {
@@ -161,8 +198,7 @@ void Sat1Microphone::configure_stream_settings_() {
     channel_count = 2;
   }
 #endif
-  //report 16kHz sample rate, as the 48kHz i2s samples will be subsampled to 16kHz
-  this->audio_stream_info_ = audio::AudioStreamInfo(bits_per_sample, channel_count, 16000);
+  this->audio_stream_info_ = audio::AudioStreamInfo(bits_per_sample, channel_count, this->sample_rate_);
 }
 
 
@@ -172,11 +208,15 @@ bool Sat1Microphone::start_driver_() {
     ESP_LOGE(TAG, "Failed to start I2S channel");
     return false;
   }
+  this->rx_started_ = true;
   this->configure_stream_settings_();  // redetermine the settings in case some settings were changed after compilation
   return true;
 }
 
 bool Sat1Microphone::stop_driver_() {
+  if (!this->rx_started_) {
+    return true;
+  }
   return this->stop_i2s_channel_();
 }
 
@@ -230,27 +270,56 @@ void Sat1Microphone::fix_dc_offset_(std::vector<uint8_t> &data) {
 }
 
 
+void Sat1Microphone::pcm_worker_task(void *params) {
+  Sat1Microphone *mic = static_cast<Sat1Microphone *>(params);
+
+  while (true) {
+    AudioBatch* batch = nullptr;
+
+    if (xQueueReceive(mic->filled_queue_, &batch, portMAX_DELAY) == pdTRUE) {
+      if (mic->pcm_data_callbacks_.size() > 0) {
+        // process(batch->data, batch->count);
+        mic->pcm_data_callbacks_.call(batch->data, batch->count);
+      }
+    }
+    xQueueSend(mic->free_queue_, &batch, 0); // return to pool
+  }
+}
+
+
 void Sat1Microphone::mic_task(void *params) {
   Sat1Microphone *this_microphone = (Sat1Microphone *) params;
   xEventGroupSetBits(this_microphone->event_group_, MicrophoneEventGroupBits::TASK_STARTING);
   
   {  // Ensures the samples vector is freed when the task stops
-    // read 3 times the amount of bytes as we need to subsample from 48 kHz to 16 kHz
-    const size_t bytes_to_read = 3 * this_microphone->audio_stream_info_.ms_to_bytes(READ_DURATION_MS);
+    const size_t bytes_to_read = this_microphone->audio_stream_info_.ms_to_bytes(READ_DURATION_MS);
+    const size_t buffer_size = 2 * pdMS_TO_TICKS(READ_DURATION_MS);
     std::vector<uint8_t> samples;
     samples.reserve(bytes_to_read);
 
     xEventGroupSetBits(this_microphone->event_group_, MicrophoneEventGroupBits::TASK_RUNNING);
     while (!(xEventGroupGetBits(this_microphone->event_group_) & MicrophoneEventGroupBits::COMMAND_STOP)) {
-      if (this_microphone->data_callbacks_.size() > 0) {
+      if (this_microphone->data_callbacks_.size() > 0 || this_microphone->pcm_data_callbacks_.size() > 0) {
         samples.resize(bytes_to_read);
-        size_t bytes_read = this_microphone->read_(samples.data(), bytes_to_read, 2 * pdMS_TO_TICKS(READ_DURATION_MS));
+        size_t bytes_read = this_microphone->read_(samples.data(), bytes_to_read, buffer_size);
         size_t samples_read = bytes_read / sizeof(int32_t);
         int32_t* samples_32 = reinterpret_cast<int32_t*>(samples.data());
-        for (size_t i = 0; i < samples_read; i += 3) {
-          samples_32[i / 3] = samples_32[i];
+        if (this_microphone->pcm_data_callbacks_.size() > 0) {
+          AudioBatch* batch = nullptr;
+
+          if (xQueueReceive(this_microphone->free_queue_, &batch, 0) == pdTRUE) {
+            size_t n = samples_read;
+            if (n > BATCH_SAMPLES) n = BATCH_SAMPLES;
+            batch->count = n;
+            memcpy(batch->data, samples_32, n * sizeof(int32_t));
+            if (xQueueSend(this_microphone->filled_queue_, &batch, 0) != pdTRUE) {
+              xQueueSend(this_microphone->free_queue_, &batch, 0);
+            }
+          }
         }
-        samples.resize((samples_read / 3) * sizeof(int32_t));
+        if (this_microphone->data_callbacks_.size() == 0) {
+          continue;
+        }
         if (this_microphone->correct_dc_offset_) {
           this_microphone->fix_dc_offset_(samples);
         }

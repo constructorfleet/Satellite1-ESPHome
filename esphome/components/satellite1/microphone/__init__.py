@@ -1,6 +1,7 @@
-from esphome import pins
+from esphome import pins, automation
 import esphome.codegen as cg
 from esphome.components import audio, esp32, microphone
+from esphome.cpp_generator import MockObj
 from esphome.components.adc import ESP32_VARIANT_ADC1_PIN_TO_CHANNEL, validate_adc_pin
 import esphome.config_validation as cv
 from esphome.const import (
@@ -10,6 +11,7 @@ from esphome.const import (
     CONF_NUM_CHANNELS,
     CONF_NUMBER,
     CONF_SAMPLE_RATE,
+    CONF_TRIGGER_ID,
 )
 from esphome.components.i2s_audio import (
     CONF_I2S_DIN_PIN,
@@ -32,6 +34,13 @@ CONF_ADC_PIN = "adc_pin"
 CONF_ADC_TYPE = "adc_type"
 CONF_CORRECT_DC_OFFSET = "correct_dc_offset"
 CONF_PDM = "pdm"
+CONF_ON_PCM_DATA = "on_pcm_data"
+
+const_int32_ptr = MockObj(f"const int32_t*", "")
+PCMDataTrigger = i2s_audio_ns.class_(
+    "PCMDataTrigger",
+    automation.Trigger.template(const_int32_ptr, cg.size_t),
+)
 
 
 Sat1Microphone = i2s_audio_ns.class_("Sat1Microphone", I2SAudioIn, microphone.Microphone, cg.Component)
@@ -88,20 +97,25 @@ def _supported_satellite1_settings(config):
         raise cv.Invalid("PDM is not supported for the Satellite1 microphone integration.")
     if config[CONF_BITS_PER_SAMPLE] != 32:
         raise cv.Invalid("I2S needs to be set to 32bit for the satellite1 microphone integration.")
-    if config[CONF_SAMPLE_RATE] != 48000:
-        raise cv.Invalid("I2S needs to be set to 48kHz, downsampling to 16kHz is hard coded.")
+    if config[CONF_SAMPLE_RATE] != 16000:
+        raise cv.Invalid("I2S needs to be set to 16kHz for the Satellite1 microphone integration.")
     return config
 
 
 BASE_SCHEMA = microphone.MICROPHONE_SCHEMA.extend(
     i2s_audio_component_schema(
         Sat1Microphone,
-        default_sample_rate=48000,
+        default_sample_rate=16000,
         default_channel=CONF_STEREO,
         default_bits_per_sample="32bit",
     ).extend(
         {
             cv.Optional(CONF_CORRECT_DC_OFFSET, default=False): cv.boolean,
+            cv.Optional(CONF_ON_PCM_DATA): automation.validate_automation(
+            {
+                cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(PCMDataTrigger),
+            }
+        ),
         }
     )
 ).extend(cv.COMPONENT_SCHEMA)
@@ -147,6 +161,13 @@ async def to_code(config):
     await cg.register_component(var, config)
     await register_i2s_audio_component(var, config)
     await microphone.register_microphone(var, config)
+    for conf in config.get(CONF_ON_PCM_DATA, []):
+        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var)
+        await automation.build_automation(
+            trigger,
+            [(const_int32_ptr, "x"), (cg.size_t, "y")],
+            conf,
+        )
 
     if config[CONF_ADC_TYPE] == "internal":
         variant = esp32.get_esp32_variant()
