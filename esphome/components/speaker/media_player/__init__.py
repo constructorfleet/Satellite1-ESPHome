@@ -317,7 +317,6 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_ON_MUTE): automation.validate_automation(single=True),
             cv.Optional(CONF_ON_UNMUTE): automation.validate_automation(single=True),
             cv.Optional(CONF_ON_VOLUME): automation.validate_automation(single=True),
-            cv.Optional(CONF_SNAPCAST_CLIENT): cv.use_id(snapcast.SnapcastClient)
         }
     ),
     cv.only_on_esp32,
