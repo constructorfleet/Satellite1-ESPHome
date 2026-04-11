@@ -6,7 +6,7 @@ from pathlib import Path
 
 from esphome import automation, external_files
 import esphome.codegen as cg
-from esphome.components import audio, esp32, media_player, network, ota, psram, speaker, snapcast
+from esphome.components import audio, esp32, media_player, network, ota, psram, speaker
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_BUFFER_SIZE,
@@ -382,9 +382,9 @@ async def to_code(config):
                     _get_supported_format_struct(media_pipeline_config, "MEDIA")
                 )
             )
-    if client_id := config.get(CONF_SNAPCAST_CLIENT):
-        snapcast_client = await cg.get_variable(client_id)
-        cg.add( var.set_snapcast_client(snapcast_client))
+    # if client_id := config.get(CONF_SNAPCAST_CLIENT):
+    #     snapcast_client = await cg.get_variable(client_id)
+    #     cg.add( var.set_snapcast_client(snapcast_client))
 
     if on_mute := config.get(CONF_ON_MUTE):
         await automation.build_automation(
