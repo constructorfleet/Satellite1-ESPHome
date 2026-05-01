@@ -72,8 +72,8 @@ void MicroWakeWord::dump_config() {
 #endif
 }
 
-void MicroWakeWord::add_audio_data_callback(std::function<void(const std::vector<uint8_t> &)> callback) {
-  this->audio_data_callbacks_.add(std::move(callback));
+void MicroWakeWord::add_audio_data_trigger(Trigger<const std::vector<uint8_t> &> *trigger) {
+  this->audio_data_triggers_.push_back(trigger);
 }
 
 void MicroWakeWord::setup() {
@@ -120,8 +120,10 @@ void MicroWakeWord::setup() {
         temp_ring_buffer->reset();
       }
       temp_ring_buffer->write((void *) data.data(), data.size());
-      if (this->audio_data_callbacks_.size() > 0) {
-        this->audio_data_callbacks_.call(data);
+      if (!this->audio_data_triggers_.empty()) {
+        for (auto *trigger : this->audio_data_triggers_) {
+          trigger->trigger(data);
+        }
       }
     }
   });
