@@ -29,8 +29,6 @@ from esphome.const import (
 )
 from esphome.core import CORE, HexInt
 
-_LOGGER = logging.getLogger(__name__)
-
 CODEOWNERS = ["@kahrendt", "@jesserockz"]
 DEPENDENCIES = ["microphone"]
 
