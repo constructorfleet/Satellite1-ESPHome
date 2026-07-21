@@ -20,6 +20,7 @@ from esphome.const import (
     CONF_RAW_DATA_ID,
     CONF_REF,
     CONF_REFRESH,
+    CONF_TRIGGER_ID,
     CONF_TYPE,
     CONF_URL,
     CONF_USERNAME,
@@ -38,6 +39,7 @@ DOMAIN = "micro_wake_word"
 
 CONF_FEATURE_STEP_SIZE = "feature_step_size"
 CONF_MODELS = "models"
+CONF_ON_AUDIO_DATA = "on_audio_data"
 CONF_ON_WAKE_WORD_DETECTED = "on_wake_word_detected"
 CONF_PROBABILITY_CUTOFF = "probability_cutoff"
 CONF_SLIDING_WINDOW_AVERAGE_SIZE = "sliding_window_average_size"
@@ -65,6 +67,13 @@ IsRunningCondition = micro_wake_word_ns.class_(
 )
 
 WakeWordModel = micro_wake_word_ns.class_("WakeWordModel")
+
+AudioDataTrigger = micro_wake_word_ns.class_(
+    "AudioDataTrigger",
+    automation.Trigger.template(
+        cg.std_vector.template(cg.uint8).operator("ref").operator("const")
+    ),
+)
 
 
 def _validate_json_filename(value):
@@ -352,6 +361,9 @@ CONFIG_SCHEMA = cv.All(
             cv.Required(CONF_MODELS): cv.ensure_list(
                 cv.maybe_simple_value(MODEL_SCHEMA, key=CONF_MODEL)
             ),
+            cv.Optional(CONF_ON_AUDIO_DATA): automation.validate_automation(
+                {cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(AudioDataTrigger)}
+            ),
             cv.Optional(CONF_ON_WAKE_WORD_DETECTED): automation.validate_automation(
                 single=True
             ),
@@ -517,6 +529,22 @@ async def to_code(config):
 
     cg.add(var.set_features_step_size(manifest[KEY_MICRO][CONF_FEATURE_STEP_SIZE]))
     cg.add(var.set_stop_after_detection(config[CONF_STOP_AFTER_DETECTION]))
+
+    if on_audio_data_config := config.get(CONF_ON_AUDIO_DATA):
+        for conf in on_audio_data_config:
+            trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var)
+            await automation.build_automation(
+                trigger,
+                [
+                    (
+                        cg.std_vector.template(cg.uint8)
+                        .operator("ref")
+                        .operator("const"),
+                        "x",
+                    )
+                ],
+                conf,
+            )
 
     if on_wake_word_detection_config := config.get(CONF_ON_WAKE_WORD_DETECTED):
         await automation.build_automation(

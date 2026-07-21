@@ -72,6 +72,10 @@ void MicroWakeWord::dump_config() {
 #endif
 }
 
+void MicroWakeWord::add_audio_data_trigger(Trigger<const std::vector<uint8_t> &> *trigger) {
+  this->audio_data_triggers_.push_back(trigger);
+}
+
 void MicroWakeWord::setup() {
   this->frontend_config_.window.size_ms = FEATURE_DURATION_MS;
   this->frontend_config_.window.step_size_ms = this->features_step_size_;
@@ -116,6 +120,11 @@ void MicroWakeWord::setup() {
         temp_ring_buffer->reset();
       }
       temp_ring_buffer->write((void *) data.data(), data.size());
+      if (!this->audio_data_triggers_.empty()) {
+        for (auto *trigger : this->audio_data_triggers_) {
+          trigger->trigger(data);
+        }
+      }
     }
   });
 

@@ -206,6 +206,9 @@ class TimedAudioSinkTransferBuffer : public AudioSinkTransferBuffer {
   uint32_t last_adjustment_at_{0};
 };
 
+// Alias for compatibility with voice_assistant component
+using RingBufferAudioSource = AudioSourceTransferBuffer;
+
 }  // namespace audio
 }  // namespace esphome
 
