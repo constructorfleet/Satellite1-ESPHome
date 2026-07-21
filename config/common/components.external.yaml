@@ -1,24 +1,21 @@
 substitutions:
-  ext_comp_repo_ref: copilot/reapply-changes-from-feat-mww-audio-trigger
+  ext_comp_repo_ref: develop
 
 external_components:
   - source:
       type: git
-      url: https://github.com/constructorfleet/satellite1-esphome
+      url: https://github.com/FutureProofHomes/Satellite1-ESPHome
       ref: ${ext_comp_repo_ref}
     components:
       - audio
+      - fusb302b
+      - i2s_audio
+      - memory_flasher
       - micro_wake_word
       - mixer
+      - pcm5122
       - resampler
+      - satellite1
       - snapcast
       - speaker
-      - version
-
-  - source:
-      # https://github.com/esphome/esphome/pull/12429
-      type: git
-      url: https://github.com/esphome/esphome
-      ref: ff8ce89556748509d7ee8724e12d9d43d3c8c1e8
-    refresh: 300s
-    components: [http_request]
+      - tas2780

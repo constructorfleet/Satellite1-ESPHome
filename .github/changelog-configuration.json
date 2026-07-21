@@ -20,10 +20,6 @@
       "labels": ["breaking", "migration"]
     },
     {
-      "title": "## Dashboard Builder",
-      "labels": ["dashboard-builder"]
-    },
-    {
       "title": "## Internal",
       "labels": ["internal"]
     }

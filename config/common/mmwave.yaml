@@ -1,9 +1,0 @@
-satellite1_radar:
-  id: sat1_radar
-  uart_id: uart_mmwave
-
-text_sensor:
-  - platform: satellite1_radar
-    id: radar_detected_text
-    satellite1_radar_id: sat1_radar
-    name: Radar Detected

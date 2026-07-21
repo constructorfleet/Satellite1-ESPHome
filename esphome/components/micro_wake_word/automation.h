@@ -49,11 +49,6 @@ template<typename... Ts> class ModelIsEnabledCondition : public Condition<Ts...>
   WakeWordModel *wake_word_model_;
 };
 
-class AudioDataTrigger : public Trigger<const std::vector<uint8_t> &> {
- public:
-  explicit AudioDataTrigger(MicroWakeWord *mww) { mww->add_audio_data_trigger(this); }
-};
-
 }  // namespace micro_wake_word
 }  // namespace esphome
 #endif

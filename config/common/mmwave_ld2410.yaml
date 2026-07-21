@@ -1,6 +1,11 @@
 ld2410:
-  id: ld2410_radar
-  uart_id: uart_mmwave
+
+uart:
+  tx_pin: GPIO43
+  rx_pin: GPIO44
+  baud_rate: 256000
+  parity: NONE
+  stop_bits: 1
 
 button:
   - platform: ld2410

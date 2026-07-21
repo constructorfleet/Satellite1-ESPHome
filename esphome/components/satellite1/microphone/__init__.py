@@ -21,6 +21,7 @@ from esphome.components.i2s_audio import (
     i2s_audio_component_schema,
     i2s_audio_ns,
     register_i2s_audio_component,
+    use_legacy,
     validate_mclk_divisible_by_3,
 ) 
 
@@ -133,8 +134,9 @@ CONFIG_SCHEMA = cv.All(
 
 
 def _final_validate(config):
-    if config[CONF_ADC_TYPE] == "internal":
-        raise cv.Invalid("Internal ADC is only compatible with legacy i2s driver.")
+    if not use_legacy():
+        if config[CONF_ADC_TYPE] == "internal":
+            raise cv.Invalid("Internal ADC is only compatible with legacy i2s driver.")
 
 
 FINAL_VALIDATE_SCHEMA = _final_validate

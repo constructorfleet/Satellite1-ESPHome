@@ -148,10 +148,7 @@ class PowerDelivery {
 
   void set_request_voltage(int voltage) { this->request_voltage_ = voltage; }
   std::string get_contract_string(pd_contract_t contract) const;
-
-  template<typename F> void add_on_state_callback(F &&callback) {
-    this->state_callback_.add(std::forward<F>(callback));
-  }
+  void add_on_state_callback(std::function<void()> &&callback);
 
   void set_ams(bool ams);
   bool check_ams();

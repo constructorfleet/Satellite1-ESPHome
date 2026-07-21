@@ -224,5 +224,9 @@ float DACProxy::volume() {
   return 0.;
 }
 
+void DACProxy::add_on_state_callback(std::function<void()> &&callback) {
+  this->state_callback_.add(std::move(callback));
+}
+
 }  // namespace satellite1
 }  // namespace esphome
