@@ -16,10 +16,11 @@
 namespace esphome {
 namespace wake_audio_stream {
 
-/// Streams raw audio (int16 PCM, mono, 16 kHz) off-device over UDP so it can be recorded and labeled as
-/// wake-word training data. It is fed by microWakeWord's `on_audio_data` trigger, which delivers the exact
-/// audio the wake-word models process (so both detections and misses can be captured). Audio arrives on the
-/// microphone task; it is buffered in a thread-safe ring buffer and flushed to the socket from the main loop.
+/// Streams audio (signed little-endian int16 PCM, mono, 16 kHz) in self-describing WWD2 UDP packets so it can
+/// be recorded and labeled as wake-word training data. It is fed by microWakeWord's `on_audio_data` trigger,
+/// which delivers the exact audio the wake-word models process (so both detections and misses can be captured).
+/// Audio arrives on the microphone task; it is buffered in a thread-safe ring buffer and flushed to the socket
+/// from the main loop.
 class WakeAudioStream : public Component {
  public:
   void setup() override;
@@ -57,6 +58,7 @@ class WakeAudioStream : public Component {
   std::vector<uint8_t> packet_buffer_;
   std::string assistant_id_;
   size_t packet_header_size_{0};
+  uint32_t packet_sequence_{0};
 
   std::unique_ptr<socket::Socket> socket_{nullptr};
   struct sockaddr_storage dest_addr_;

@@ -19,8 +19,25 @@ static const size_t BYTES_PER_SECOND = 16000 * sizeof(int16_t);
 // Max UDP payload we send per datagram. Kept below a typical MTU to avoid IP fragmentation. Must be a
 // multiple of sizeof(int16_t) so we never split a sample across datagrams.
 static const size_t SEND_CHUNK_SIZE = 1024;
-static const uint8_t PACKET_MAGIC[] = {'W', 'W', 'D', '1'};
+static const uint8_t PACKET_MAGIC[] = {'W', 'W', 'D', '2'};
+static const size_t FIXED_HEADER_SIZE = 18;
+static const uint8_t AUDIO_CHANNELS = 1;
+static const uint8_t BITS_PER_SAMPLE = 16;
+static const uint8_t AUDIO_ENCODING_PCM_SIGNED_LE = 1;
+static const uint32_t AUDIO_SAMPLE_RATE = 16000;
 static const size_t MAX_ASSISTANT_ID_BYTES = 64;
+
+static void write_u16_be(uint8_t *buffer, uint16_t value) {
+  buffer[0] = static_cast<uint8_t>(value >> 8);
+  buffer[1] = static_cast<uint8_t>(value);
+}
+
+static void write_u32_be(uint8_t *buffer, uint32_t value) {
+  buffer[0] = static_cast<uint8_t>(value >> 24);
+  buffer[1] = static_cast<uint8_t>(value >> 16);
+  buffer[2] = static_cast<uint8_t>(value >> 8);
+  buffer[3] = static_cast<uint8_t>(value);
+}
 
 float WakeAudioStream::get_setup_priority() const { return setup_priority::AFTER_CONNECTION; }
 
@@ -42,12 +59,15 @@ void WakeAudioStream::setup() {
     this->mark_failed();
     return;
   }
-  this->packet_header_size_ = sizeof(PACKET_MAGIC) + 1 + this->assistant_id_.size();
+  this->packet_header_size_ = FIXED_HEADER_SIZE + this->assistant_id_.size();
   this->packet_buffer_.resize(this->packet_header_size_ + SEND_CHUNK_SIZE);
   memcpy(this->packet_buffer_.data(), PACKET_MAGIC, sizeof(PACKET_MAGIC));
   this->packet_buffer_[sizeof(PACKET_MAGIC)] = static_cast<uint8_t>(this->assistant_id_.size());
-  memcpy(this->packet_buffer_.data() + sizeof(PACKET_MAGIC) + 1, this->assistant_id_.data(),
-         this->assistant_id_.size());
+  this->packet_buffer_[5] = AUDIO_CHANNELS;
+  this->packet_buffer_[6] = BITS_PER_SAMPLE;
+  this->packet_buffer_[7] = AUDIO_ENCODING_PCM_SIGNED_LE;
+  write_u32_be(this->packet_buffer_.data() + 8, AUDIO_SAMPLE_RATE);
+  memcpy(this->packet_buffer_.data() + FIXED_HEADER_SIZE, this->assistant_id_.data(), this->assistant_id_.size());
 }
 
 void WakeAudioStream::dump_config() {
@@ -56,6 +76,8 @@ void WakeAudioStream::dump_config() {
                 this->remote_ip_[3], this->remote_port_);
   ESP_LOGCONFIG(TAG, "  Buffer duration: %u ms", (unsigned) this->buffer_duration_ms_);
   ESP_LOGCONFIG(TAG, "  Assistant ID: %s", this->assistant_id_.c_str());
+  ESP_LOGCONFIG(TAG, "  Format: %u Hz, %u-bit, %u channel(s), signed little-endian PCM", AUDIO_SAMPLE_RATE,
+                BITS_PER_SAMPLE, AUDIO_CHANNELS);
   ESP_LOGCONFIG(TAG, "  Enabled on boot: %s", YESNO(this->enabled_));
 }
 
@@ -101,6 +123,7 @@ void WakeAudioStream::set_enabled(bool enabled) {
   }
   this->enabled_ = enabled;
   if (enabled) {
+    this->packet_sequence_ = 0;
     ESP_LOGI(TAG, "Wake-word audio capture enabled -> %u.%u.%u.%u:%u", this->remote_ip_[0], this->remote_ip_[1],
              this->remote_ip_[2], this->remote_ip_[3], this->remote_port_);
   } else {
@@ -139,6 +162,8 @@ void WakeAudioStream::loop() {
     if (read_bytes == 0) {
       break;
     }
+    write_u32_be(this->packet_buffer_.data() + 12, this->packet_sequence_++);
+    write_u16_be(this->packet_buffer_.data() + 16, static_cast<uint16_t>(read_bytes));
     ssize_t sent = this->socket_->sendto(this->packet_buffer_.data(), this->packet_header_size_ + read_bytes, 0,
                                          (struct sockaddr *) &this->dest_addr_, sizeof(this->dest_addr_));
     if (sent < 0) {
