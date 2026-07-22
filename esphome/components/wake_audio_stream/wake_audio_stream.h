@@ -10,6 +10,7 @@
 #include "esphome/components/socket/socket.h"
 
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace esphome {
@@ -53,7 +54,9 @@ class WakeAudioStream : public Component {
   bool enabled_{false};
 
   std::unique_ptr<RingBuffer> ring_buffer_;
-  std::vector<uint8_t> send_buffer_;
+  std::vector<uint8_t> packet_buffer_;
+  std::string assistant_id_;
+  size_t packet_header_size_{0};
 
   std::unique_ptr<socket::Socket> socket_{nullptr};
   struct sockaddr_storage dest_addr_;

@@ -62,15 +62,16 @@ micro_wake_word:
     - lambda: id(wake_audio_streamer).push_audio(x);
   on_wake_word_detected:
     # When capturing training data, tell the ingest service a wake word fired so it can extract a
-    # clip from the UDP audio it is already buffering. Omitting assistant_id lets the service key
-    # the clip by this device's IP, matching how it buffers the UDP audio stream.
+    # clip from the UDP audio it is already buffering. Use the ESPHome node name as the explicit
+    # assistant ID so UDP and HTTP identity still match when both pass through Traefik.
     - if:
         condition:
           switch.is_on: wake_audio_capture
         then:
           - http_request.post:
               url: !lambda |-
-                return "http://${wake_audio_stream_host}:${wake_event_http_port}/wake_event?wake_word=" + wake_word;
+                return "http://${wake_audio_stream_host}:${wake_event_http_port}/wake_event?assistant_id=" +
+                       App.get_name() + "&wake_word=" + wake_word;
               capture_response: false
     # If the wake word is detected when the device is muted (Possible with the software mute switch): Do nothing
     - if:

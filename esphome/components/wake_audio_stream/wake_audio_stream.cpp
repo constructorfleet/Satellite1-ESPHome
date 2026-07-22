@@ -2,6 +2,7 @@
 
 #ifdef USE_ESP32
 
+#include "esphome/core/application.h"
 #include "esphome/core/log.h"
 
 #include <cerrno>
@@ -18,10 +19,20 @@ static const size_t BYTES_PER_SECOND = 16000 * sizeof(int16_t);
 // Max UDP payload we send per datagram. Kept below a typical MTU to avoid IP fragmentation. Must be a
 // multiple of sizeof(int16_t) so we never split a sample across datagrams.
 static const size_t SEND_CHUNK_SIZE = 1024;
+static const uint8_t PACKET_MAGIC[] = {'W', 'W', 'D', '1'};
+static const size_t MAX_ASSISTANT_ID_BYTES = 64;
 
 float WakeAudioStream::get_setup_priority() const { return setup_priority::AFTER_CONNECTION; }
 
 void WakeAudioStream::setup() {
+  this->assistant_id_ = App.get_name();
+  if (this->assistant_id_.empty() || this->assistant_id_.size() > MAX_ASSISTANT_ID_BYTES) {
+    ESP_LOGE(TAG, "Device name must contain 1 to %u bytes for UDP assistant identity",
+             (unsigned) MAX_ASSISTANT_ID_BYTES);
+    this->mark_failed();
+    return;
+  }
+
   size_t ring_bytes = BYTES_PER_SECOND * this->buffer_duration_ms_ / 1000;
   // Round up to a whole number of send chunks so draining is clean.
   ring_bytes = ((ring_bytes + SEND_CHUNK_SIZE - 1) / SEND_CHUNK_SIZE) * SEND_CHUNK_SIZE;
@@ -31,7 +42,12 @@ void WakeAudioStream::setup() {
     this->mark_failed();
     return;
   }
-  this->send_buffer_.resize(SEND_CHUNK_SIZE);
+  this->packet_header_size_ = sizeof(PACKET_MAGIC) + 1 + this->assistant_id_.size();
+  this->packet_buffer_.resize(this->packet_header_size_ + SEND_CHUNK_SIZE);
+  memcpy(this->packet_buffer_.data(), PACKET_MAGIC, sizeof(PACKET_MAGIC));
+  this->packet_buffer_[sizeof(PACKET_MAGIC)] = static_cast<uint8_t>(this->assistant_id_.size());
+  memcpy(this->packet_buffer_.data() + sizeof(PACKET_MAGIC) + 1, this->assistant_id_.data(),
+         this->assistant_id_.size());
 }
 
 void WakeAudioStream::dump_config() {
@@ -39,6 +55,7 @@ void WakeAudioStream::dump_config() {
   ESP_LOGCONFIG(TAG, "  Destination: %u.%u.%u.%u:%u", this->remote_ip_[0], this->remote_ip_[1], this->remote_ip_[2],
                 this->remote_ip_[3], this->remote_port_);
   ESP_LOGCONFIG(TAG, "  Buffer duration: %u ms", (unsigned) this->buffer_duration_ms_);
+  ESP_LOGCONFIG(TAG, "  Assistant ID: %s", this->assistant_id_.c_str());
   ESP_LOGCONFIG(TAG, "  Enabled on boot: %s", YESNO(this->enabled_));
 }
 
@@ -117,11 +134,12 @@ void WakeAudioStream::loop() {
   }
 
   while (this->ring_buffer_->available() >= SEND_CHUNK_SIZE) {
-    size_t read_bytes = this->ring_buffer_->read(this->send_buffer_.data(), SEND_CHUNK_SIZE, 0);
+    size_t read_bytes =
+        this->ring_buffer_->read(this->packet_buffer_.data() + this->packet_header_size_, SEND_CHUNK_SIZE, 0);
     if (read_bytes == 0) {
       break;
     }
-    ssize_t sent = this->socket_->sendto(this->send_buffer_.data(), read_bytes, 0,
+    ssize_t sent = this->socket_->sendto(this->packet_buffer_.data(), this->packet_header_size_ + read_bytes, 0,
                                          (struct sockaddr *) &this->dest_addr_, sizeof(this->dest_addr_));
     if (sent < 0) {
       // ENOMEM/EAGAIN just means the stack is momentarily busy; drop this chunk and try again next loop.
