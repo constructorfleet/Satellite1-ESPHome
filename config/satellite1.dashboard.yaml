@@ -1,15 +1,11 @@
 substitutions:
   name: satellite1
+  node_name: ${name}
   friendly_name: Satellite1
   xmos_fw_version: "v1.0.3"
 
   # OPTIONALLY, set the log level to debug, info, warn, error
   log_level: debug
-
-esphome:
-  name: ${name}
-  name_add_mac_suffix: true
-  friendly_name: ${friendly_name}
 
 packages:
   FutureProofHomes.Satellite1:
@@ -19,6 +15,18 @@ packages:
     files:
       # Main config files, don't remove
       - config/satellite1.base.yaml
+      - config/common/core_board.yaml
+      - config/common/wifi_improv.yaml
+      - config/common/hat_sensors.yaml
+      - config/common/buttons.yaml
+      - config/common/home_assistant.yaml
+      - config/common/speaker.yaml
+      - config/common/media_player.yaml
+      - config/common/voice_assistant.yaml
+      - config/common/timer.yaml
+      - config/common/led_ring.yaml
+      - config/common/mmwave.yaml
+      - config/common/sendspin.yaml
       - config/common/dashboard_build.yaml
       - path: config/common/components.external.yaml
         vars:

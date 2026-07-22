@@ -37,11 +37,32 @@ globals:
     restore_value: no
     initial_value: '0'
 
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: ESP32S3
+  flash_size: 16MB
+  toolchain: platformio
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_SPIRAM_RODATA: "y"
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: "y"
+      CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+      CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB: "y"
+      CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST: "y"
+      CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
+      CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
+      CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"
+
 esphome:
   name: ${node_name}
   name_add_mac_suffix: true
   friendly_name: ${friendly_name}
-  min_version: 2026.4.0
+  min_version: 2026.7.0
+  platformio_options:
+    board_build.flash_mode: dio
+    board_upload.maximum_size: 16777216
 
   project:
     name: ${company_name}.${project_name}
@@ -77,24 +98,6 @@ ota:
 dashboard_import:
   package_import_url: github://futureproofhomes/satellite1-esphome/config/satellite1.dashboard.yaml@staging
   import_full_config: true
-
-packages:
-  core_board: !include common/core_board.yaml
-  wifi: !include common/wifi_improv.yaml
-  sensors: !include common/hat_sensors.yaml
-  buttons: !include common/buttons.yaml
-  ha: !include common/home_assistant.yaml
-  spk: !include common/speaker.yaml
-  mp: !include common/media_player.yaml
-  va: !include common/voice_assistant.yaml
-  timer: !include common/timer.yaml
-  led_ring: !include common/led_ring.yaml
-  mmwave: !include common/mmwave.yaml
-  sendspin: !include common/sendspin.yaml
-
-  ## OPTIONAL COMPONENTS
-  # debug: !include common/debug.yaml
-  # developer: !include common/developer.yaml
 
 fusb302b:
   id: pd_fusb302b

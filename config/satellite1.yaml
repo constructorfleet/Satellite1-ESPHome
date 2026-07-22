@@ -6,6 +6,19 @@ substitutions:
   esp32_fw_version: dev
 
 packages:
+  core_board: !include common/core_board.yaml
+  wifi: !include common/wifi_improv.yaml
+  sensors: !include common/hat_sensors.yaml
+  buttons: !include common/buttons.yaml
+  ha: !include common/home_assistant.yaml
+  spk: !include common/speaker.yaml
+  mp: !include common/media_player.yaml
+  va: !include common/voice_assistant.yaml
+  timer: !include common/timer.yaml
+  led_ring: !include common/led_ring.yaml
+  mmwave: !include common/mmwave.yaml
+  sendspin: !include common/sendspin.yaml
+
   # This is an inline package to prefix the on_client_connected with the wait_until action
   # It must appear before the actual package so it becomes the original config and the
   # on_client_connected list from the package config is appended onto this one.

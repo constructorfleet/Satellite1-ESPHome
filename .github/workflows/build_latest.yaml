@@ -85,7 +85,9 @@ jobs:
         uses: esphome/build-action@v7.0.0
         with:
           yaml-file: dashboard-smoke/satellite1.dashboard.yaml
-          version: ${{ needs.resolve-esphome-version.outputs.esphome-version }}
+          # Dashboard consumers run the current add-on release. Keep this smoke
+          # test on the version that introduced strict platform/package merging.
+          version: 2026.7.1
 
 
   create_artifact_matrix:
