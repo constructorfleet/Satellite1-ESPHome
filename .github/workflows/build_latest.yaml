@@ -59,7 +59,7 @@ jobs:
       - name: Download dashboard import config from current commit
         run: |
           mkdir -p dashboard-smoke
-          url="https://raw.githubusercontent.com/FutureProofHomes/Satellite1-ESPHome/${{ github.sha }}/config/satellite1.dashboard.yaml"
+          url="https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/config/satellite1.dashboard.yaml"
           curl -fsSL "$url" -o dashboard-smoke/satellite1.dashboard.yaml
 
       - name: Show dashboard import refs
@@ -70,16 +70,19 @@ jobs:
 
       - name: Rewrite dashboard package ref to current branch
         run: |
+          repository="https://github.com/${{ github.repository }}"
           branch="${{ github.ref_name }}"
           if [ -z "$branch" ]; then
             echo "Failed to resolve current branch"
             exit 1
           fi
 
+          sed -i -E "s|^(\s*url:\s*&repo_url\s*\").*(\")$|\1${repository}\2|" dashboard-smoke/satellite1.dashboard.yaml
           sed -i -E "s|^(\s*ref:\s*&repo_ref\s*\").*(\")$|\1${branch}\2|" dashboard-smoke/satellite1.dashboard.yaml
 
+          echo "Dashboard package repository rewritten to: ${repository}"
           echo "Dashboard package ref rewritten to: $branch"
-          grep -nE '^\s*ref:\s*&repo_ref' dashboard-smoke/satellite1.dashboard.yaml
+          grep -nE '^\s*(url:\s*&repo_url|ref:\s*&repo_ref)' dashboard-smoke/satellite1.dashboard.yaml
 
       - name: Build dashboard import config
         uses: esphome/build-action@v7.0.0
